@@ -5,6 +5,9 @@ func _get_name() -> String:
 	return "steam_pipe"
 
 
+const MAX_FILE_MAPPINGS := 10
+
+
 func file_mapping(index: int) -> Array[Dictionary]:
 	return [
 		{
@@ -39,9 +42,6 @@ func file_mapping(index: int) -> Array[Dictionary]:
 
 func _supports_platform(platform) -> bool:
 	return true
-
-
-const max_file_mappings := 10
 
 
 func _get_export_option_visibility(platform: EditorExportPlatform, option: String) -> bool:
@@ -163,14 +163,14 @@ func _get_export_options(platform: EditorExportPlatform) -> Array[Dictionary]:
 				"name": "steam_pipe/app_build/depot_build/file_mapping_count",
 				"type": TYPE_INT,
 				"hint": PROPERTY_HINT_RANGE,
-				"hint_string": "0,%d,1" % max_file_mappings,
+				"hint_string": "0,%d,1" % MAX_FILE_MAPPINGS,
 				"usage": PROPERTY_USAGE_DEFAULT,
 			},
 			"default_value": 0,
 			"update_visibility": true,
 		},
 	]
-	for i in range(0, max_file_mappings):
+	for i in range(0, MAX_FILE_MAPPINGS):
 		d.append_array(file_mapping(i))
 
 	d.append_array(
@@ -202,13 +202,42 @@ func _get_export_options(platform: EditorExportPlatform) -> Array[Dictionary]:
 	return d
 
 
+func program_exists(program: String) -> bool:
+	var output := []
+	var exit_code: int
+	if OS.get_name() == "Windows":
+		exit_code = OS.execute("where", [program], output)
+	else:
+		exit_code = OS.execute("which", [program], output)
+	return exit_code == 0
+
+
 func _export_end() -> void:
 	if not get_option("steam_pipe/enabled"):
 		return
+	get_export_platform().add_message(
+		EditorExportPlatform.EXPORT_MESSAGE_INFO,
+		"Steam Pipe",
+		"If you have any export plugins installed that modify the contents of exported projects inside of _export_end(), Steam Pipe might run before those other plugins modified the data. Which is likely unwanted as not all files on Steam servers will be up to date. Ideally this plugin should run once files are done being modified, added or removed.",
+	)
 	var file = _build_vdf()
 	var es := EditorInterface.get_editor_settings()
 	var cmd: String = es.get_setting("steam_pipe/export/steam_cmd_path")
 	var username: String = es.get_setting("steam_pipe/export/username")
+	if username.is_empty():
+		get_export_platform().add_message(
+			EditorExportPlatform.EXPORT_MESSAGE_ERROR,
+			"Steam Pipe",
+			'Username must be set in EditorSetting. "steam_pipe/export/username"',
+		)
+		return
+	if not program_exists(cmd):
+		get_export_platform().add_message(
+			EditorExportPlatform.EXPORT_MESSAGE_ERROR,
+			"Steam Pipe",
+			'Program %s does not exist on path' % cmd,
+		)
+
 	var password: String = es.get_setting("steam_pipe/export/password")
 	var output: Array
 	await EditorInterface \
@@ -233,7 +262,11 @@ func _export_end() -> void:
 	var exit_code = OS.execute(cmd, args, output)
 	print(output)
 	if (exit_code != 0):
-		push_error("steam_pipeCMD exited with %s" % exit_code)
+		get_export_platform().add_message(
+			EditorExportPlatform.EXPORT_MESSAGE_ERROR,
+			"Steam Pipe",
+			"SteamCMD exited with %s" % exit_code,
+		)
 	file.close()
 	pass
 
@@ -313,5 +346,5 @@ func _build_vdf() -> FileAccess:
 	file.store_line("\t}")
 	file.store_line("}")
 	file.flush()
-	push_warning(file.get_as_text())
+	print_verbose(file.get_as_text())
 	return file

@@ -9,7 +9,7 @@
 
 ![](img/SteamPipeSetting.png)
 4. Configure the export options for details on what the options do see
-![Uploading to Steam](https://partner.steamgames.com/doc/sdk/uploading)
+[Uploading to Steam](https://partner.steamgames.com/doc/sdk/uploading)
 > [!Note]
 > The options are 1 to 1 with valves format. Except for versioned and user configs. Their respective
 > PackedStringArrays correspond to the LocalPath property of FileProperties in Valve's format.
